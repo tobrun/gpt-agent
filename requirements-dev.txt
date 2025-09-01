@@ -1,0 +1,12 @@
+# Development dependencies
+pytest>=7.0
+pytest-asyncio
+pytest-cov
+black
+ruff
+mypy
+pre-commit
+types-requests
+
+# Include main requirements
+-r requirements.txt
