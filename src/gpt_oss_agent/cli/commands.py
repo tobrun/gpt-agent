@@ -88,8 +88,8 @@ def show_debug_info() -> None:
 **Log Files:** {summary['total_log_files']}
 **Log Directory:** {summary['log_dir']}
 
-Use `python view_debug_logs.py --list` to view available sessions.
-Use `python view_debug_logs.py --session {summary['session_id']}` for details.
+Use `python scripts/view_debug_logs.py --list` to view available sessions.
+Use `python scripts/view_debug_logs.py --session {summary['session_id']}` for details.
     """
     
     console.print(Panel(panel_content, title="Debug Session", style="yellow"))
