@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 
 from model_client import setup_vllm_client, get_model_info
 from tools import web_search, get_page_content, check_tools_status
+from debug_logger import get_debug_logger
 
 # Load environment variables
 load_dotenv()
@@ -119,17 +120,81 @@ Remember that you're running on a local model, so you have the benefit of privac
         Returns:
             Agent response as string
         """
+        debug_logger = get_debug_logger()
+        
         try:
+            # Log user input
+            debug_logger.log_user_input(message)
+            
+            logger.info(f"Starting sync chat with message: {message[:50]}...")
             result = Runner.run_sync(
                 self.agent,
                 message,
                 **kwargs
             )
-            return result.final_output
+            logger.info(f"Runner completed. Result type: {type(result)}")
+            
+            # Log complete runner result
+            debug_logger.log_runner_result(result)
+            
+            # Debug the result object
+            logger.info(f"Result attributes: {dir(result)}")
+            
+            if hasattr(result, 'final_output'):
+                output = result.final_output
+                logger.info(f"Final output type: {type(output)}")
+                logger.info(f"Final output length: {len(str(output)) if output else 0}")
+                logger.info(f"Final output preview: {str(output)[:100] if output else 'None'}")
+                
+                # Check if final_output is empty but there are other outputs
+                if not output:
+                    logger.info("Final output is empty, checking alternative sources...")
+                    
+                    if hasattr(result, 'output'):
+                        logger.info(f"Checking result.output: {result.output}")
+                        output = result.output
+                    elif hasattr(result, 'outputs'):
+                        logger.info(f"Checking result.outputs: {result.outputs}")
+                        if result.outputs:
+                            output = result.outputs[-1] if isinstance(result.outputs, list) else result.outputs
+                    elif hasattr(result, 'new_items') and result.new_items:
+                        logger.info("Checking new_items for message output...")
+                        # Look for MessageOutputItem in new_items
+                        for item in result.new_items:
+                            if hasattr(item, 'type') and item.type == 'message_output_item':
+                                if hasattr(item, 'raw_item') and hasattr(item.raw_item, 'content'):
+                                    for content in item.raw_item.content:
+                                        if hasattr(content, 'text'):
+                                            logger.info(f"Found text in message output: {content.text[:100]}...")
+                                            output = content.text
+                                            break
+                                    if output:
+                                        break
+                
+                final_response = output if output else "Agent completed but returned no output"
+                
+                # Log agent response
+                debug_logger.log_agent_response(
+                    final_response, 
+                    metadata={
+                        "had_final_output": bool(output),
+                        "result_type": str(type(result)),
+                        "new_items_count": len(result.new_items) if hasattr(result, 'new_items') else 0
+                    }
+                )
+                
+                return final_response
+            else:
+                error_msg = "Error: No final output available from agent"
+                logger.error(f"Result has no final_output attribute. Available attributes: {dir(result)}")
+                debug_logger.log_agent_response(error_msg, metadata={"error": "no_final_output_attribute"})
+                return error_msg
             
         except Exception as e:
-            logger.error(f"Error in sync chat: {e}")
-            return f"Sorry, I encountered an error: {str(e)}"
+            logger.error(f"Error in sync chat: {e}", exc_info=True)
+            error_msg = f"Sorry, I encountered an error: {str(e)}"
+            debug_logger.log_error(e, "sync_chat")
+            return error_msg
     
     def chat_stream(self, message: str, **kwargs):
         """

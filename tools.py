@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 import requests
 from agents import function_tool
 from dotenv import load_dotenv
+from debug_logger import get_debug_logger
 
 # Load environment variables
 load_dotenv()
@@ -116,21 +117,29 @@ def web_search(query: str, num_results: int = 5) -> str:
     Returns:
         Formatted search results or error message
     """
+    debug_logger = get_debug_logger()
+    
     logger.info(f"Performing web search for: {query}")
     
     # Validate input
     if not query or not query.strip():
-        return "Error: Search query cannot be empty"
+        error_result = "Error: Search query cannot be empty"
+        debug_logger.log_tool_execution("web_search", {"query": query, "num_results": num_results}, error_result)
+        return error_result
     
     if num_results < 1 or num_results > 10:
         num_results = 5
     
     # Perform search
     results = search_client.search(query, num_results=num_results)
+    logger.info(f"Search results type: {type(results)}")
+    logger.info(f"Search results keys: {list(results.keys()) if isinstance(results, dict) else 'Not a dict'}")
     
     # Handle errors
     if "error" in results:
-        return f"Search error: {results['error']}"
+        error_result = f"Search error: {results['error']}"
+        debug_logger.log_tool_execution("web_search", {"query": query, "num_results": num_results}, error_result)
+        return error_result
     
     # Format results
     try:
@@ -160,11 +169,24 @@ def web_search(query: str, num_results: int = 5) -> str:
         else:
             formatted_results.append("No results found for this query.")
         
-        return "\n".join(formatted_results)
+        final_result = "\n".join(formatted_results)
+        logger.info(f"Final search result length: {len(final_result)}")
+        logger.info(f"Final search result preview: {final_result[:200]}...")
+        
+        # Log tool execution
+        debug_logger.log_tool_execution(
+            "web_search", 
+            {"query": query, "num_results": num_results}, 
+            final_result
+        )
+        
+        return final_result
         
     except Exception as e:
-        logger.error(f"Error formatting search results: {e}")
-        return f"Error processing search results: {str(e)}"
+        logger.error(f"Error formatting search results: {e}", exc_info=True)
+        error_result = f"Error processing search results: {str(e)}"
+        debug_logger.log_tool_execution("web_search", {"query": query, "num_results": num_results}, error_result)
+        return error_result
 
 
 @function_tool 
@@ -178,8 +200,12 @@ def get_page_content(url: str) -> str:
     Returns:
         The text content of the webpage or error message
     """
+    debug_logger = get_debug_logger()
+    
     if not search_client.api_key:
-        return "Error: EXA_API_KEY not configured. Cannot retrieve page content."
+        error_result = "Error: EXA_API_KEY not configured. Cannot retrieve page content."
+        debug_logger.log_tool_execution("get_page_content", {"url": url}, error_result)
+        return error_result
     
     try:
         headers = {
@@ -221,15 +247,22 @@ def get_page_content(url: str) -> str:
                     else:
                         content += f"Content: {text}\n"
                 
+                debug_logger.log_tool_execution("get_page_content", {"url": url}, content)
                 return content
             else:
-                return f"Error: No content found for URL: {url}"
+                error_result = f"Error: No content found for URL: {url}"
+                debug_logger.log_tool_execution("get_page_content", {"url": url}, error_result)
+                return error_result
         else:
-            return f"Error: Failed to retrieve content (status {response.status_code})"
+            error_result = f"Error: Failed to retrieve content (status {response.status_code})"
+            debug_logger.log_tool_execution("get_page_content", {"url": url}, error_result)
+            return error_result
             
     except Exception as e:
         logger.error(f"Error retrieving page content: {e}")
-        return f"Error retrieving page content: {str(e)}"
+        error_result = f"Error retrieving page content: {str(e)}"
+        debug_logger.log_tool_execution("get_page_content", {"url": url}, error_result)
+        return error_result
 
 
 def get_available_tools() -> List[str]:

@@ -1,6 +1,6 @@
 # GPT-OSS AI Agent
 
-A Python-based AI agent that connects to your locally-hosted GPT-OSS model via vLLM, with web search capabilities.
+A Python-based AI agent that connects to your locally-hosted GPT-OSS model via vLLM, with web search capabilities, using OpenAI Agents SDK.
 
 ## Quick Start
 
